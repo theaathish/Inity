@@ -34,16 +34,16 @@ Write-ColorText "Inity - Intelligent Python Project Setup Tool" $Purple
 Write-ColorText "Developed by Aathish at Strucureo" $Cyan
 Write-Host "=================================================="
 
-Write-ColorText "🔍 Detecting system..." $Blue
+Write-ColorText "Detecting system..." $Blue
 Write-Host "OS: Windows"
 Write-Host "PowerShell: $($PSVersionTable.PSVersion)"
 
 # Check if Python is available
 try {
     $pythonVersion = python --version 2>&1
-    Write-ColorText "✅ Python found: $pythonVersion" $Green
+    Write-ColorText "Python found: $pythonVersion" $Green
 } catch {
-    Write-ColorText "❌ Python is not installed or not in PATH" $Red
+    Write-ColorText "Python is not installed or not in PATH" $Red
     Write-Host "Please install Python 3.8+ from https://python.org"
     Write-Host "Make sure to check 'Add Python to PATH' during installation"
     exit 1
@@ -52,9 +52,9 @@ try {
 # Check if pip is available
 try {
     $pipVersion = pip --version 2>&1
-    Write-ColorText "✅ pip found: $pipVersion" $Green
+    Write-ColorText "pip found: $pipVersion" $Green
 } catch {
-    Write-ColorText "❌ pip is not installed" $Red
+    Write-ColorText "pip is not installed" $Red
     Write-Host "Please install pip first"
     exit 1
 }
@@ -63,7 +63,7 @@ try {
 $tempDir = New-TemporaryFile | ForEach-Object { Remove-Item $_; New-Item -ItemType Directory -Path $_ }
 Set-Location $tempDir
 
-Write-ColorText "📥 Downloading Inity..." $Blue
+Write-ColorText "Downloading Inity..." $Blue
 
 # Download Inity
 try {
@@ -79,20 +79,20 @@ try {
         Set-Location "Inity-main"
     }
 } catch {
-    Write-ColorText "❌ Failed to download Inity: $_" $Red
+    Write-ColorText "Failed to download Inity: $_" $Red
     exit 1
 }
 
-Write-ColorText "🔧 Installing Inity..." $Blue
+Write-ColorText "Installing Inity..." $Blue
 
 try {
     # Install dependencies and Inity
     pip install --user -r requirements.txt
     pip install --user -e .
     
-    Write-ColorText "✅ Inity installed successfully!" $Green
+    Write-ColorText "Inity installed successfully!" $Green
 } catch {
-    Write-ColorText "❌ Installation failed: $_" $Red
+    Write-ColorText "Installation failed: $_" $Red
     exit 1
 }
 
@@ -107,33 +107,33 @@ $batchPath = Join-Path $userPath "inity.bat"
 $batchContent | Out-File -FilePath $batchPath -Encoding ASCII
 
 Write-Host ""
-Write-ColorText "🎉 Inity installed successfully!" $Green
+Write-ColorText "Inity installed successfully!" $Green
 Write-Host ""
 
-Write-ColorText "📝 Created batch file: $batchPath" $Blue
-Write-ColorText "⚠️  To use 'inity' from anywhere, add this to your PATH:" $Yellow
+Write-ColorText "Created batch file: $batchPath" $Blue
+Write-ColorText "To use 'inity' from anywhere, add this to your PATH:" $Yellow
 Write-Host "  1. Open Environment Variables settings"
 Write-Host "  2. Add '$userPath' to your PATH"
 Write-Host "  3. Or use full path: $batchPath"
 Write-Host ""
 
-Write-ColorText "🚀 Quick Start:" $Cyan
+Write-ColorText "Quick Start:" $Cyan
 Write-Host "  inity --help                    # Show help"
 Write-Host "  inity create my-awesome-project # Create new project"
 Write-Host "  inity package search fastapi    # Search packages"
 Write-Host ""
 
-Write-ColorText "📚 Documentation: https://github.com/theaathish/Inity" $Purple
-Write-ColorText "🐛 Issues: https://github.com/theaathish/Inity/issues" $Purple
+Write-ColorText "Documentation: https://github.com/theaathish/Inity" $Purple
+Write-ColorText "Issues: https://github.com/theaathish/Inity/issues" $Purple
 Write-Host ""
 
 # Test installation
-Write-ColorText "🧪 Testing installation..." $Blue
+Write-ColorText "Testing installation..." $Blue
 try {
     python -m smartenv.main --version
-    Write-ColorText "✅ Inity is ready to use!" $Green
+    Write-ColorText "Inity is ready to use!" $Green
 } catch {
-    Write-ColorText "⚠️  Installation completed but test failed" $Yellow
+    Write-ColorText "Installation completed but test failed" $Yellow
     Write-Host "You may need to restart your command prompt"
 }
 

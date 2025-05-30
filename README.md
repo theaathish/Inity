@@ -1,3 +1,6 @@
+
+![Copy of Navy Blue And Red Modern YouTube Banner](https://github.com/user-attachments/assets/8ab11e64-e790-4f86-9aed-9d417339bd2a)
+
 # 🚀 Inity
 
 **Intelligent Python project environment setup tool**
