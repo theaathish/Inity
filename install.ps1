@@ -21,16 +21,15 @@ function Write-ColorText {
     $Host.UI.RawUI.ForegroundColor = $prevColor
 }
 
-# Art banner
-Write-ColorText @"
- ___       _ _         
-|_ _|_ __ (_) |_ _   _ 
- | || '_ \| | __| | | |
- | || | | | | |_| |_| |
-|___|_| |_|_|\__|\__, |
-                 |___/ 
-"@ $Blue
+# Art banner - Fixed: Split into separate lines
+Write-ColorText " ___       _ _         " $Blue
+Write-ColorText "|_ _|_ __ (_) |_ _   _ " $Blue
+Write-ColorText " | || '_ \| | __| | | |" $Blue
+Write-ColorText " | || | | | | |_| |_| |" $Blue
+Write-ColorText "|___|_| |_|_|\__|\__, |" $Blue
+Write-ColorText "                 |___/ " $Blue
 
+Write-Host ""
 Write-ColorText "Inity - Intelligent Python Project Setup Tool" $Purple
 Write-ColorText "Developed by Aathish at Strucureo" $Cyan
 Write-Host "=================================================="
@@ -97,13 +96,13 @@ try {
     exit 1
 }
 
-# Create batch file for easier access
-$batchContent = @"
+# Create batch file for easier access - Fixed: Use proper here-string
+$batchContent = @'
 @echo off
 python -m smartenv.main %*
-"@
+'@
 
-$userPath = [Environment]::GetFolderPath("UserProfile")
+$userPath = [Environment]::GetFolderPath('UserProfile')
 $batchPath = Join-Path $userPath "inity.bat"
 $batchContent | Out-File -FilePath $batchPath -Encoding ASCII
 
@@ -143,4 +142,4 @@ Set-Location $env:TEMP
 Remove-Item $tempDir -Recurse -Force
 
 Write-Host ""
-Write-ColorText "Happy coding with Inity! 🐍✨" $Cyan
+Write-ColorText "Happy coding with Inity!" $Cyan
