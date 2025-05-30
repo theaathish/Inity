@@ -86,9 +86,22 @@ try {
 Write-ColorText "Installing Inity..." $Blue
 
 try {
-    # Install dependencies and Inity
-    & pip install --user -r requirements.txt
-    & pip install --user -e .
+    # Try pipx first (recommended for Python applications)
+    if (Get-Command pipx -ErrorAction SilentlyContinue) {
+        Write-Host "Using pipx for installation..."
+        & pipx install -e .
+    } else {
+        # Fall back to pip with --break-system-packages for newer systems
+        Write-Host "Using pip for installation..."
+        try {
+            & pip install --user -r requirements.txt
+            & pip install --user -e .
+        } catch {
+            Write-Host "Trying with break-system-packages flag..."
+            & pip install --user --break-system-packages -r requirements.txt
+            & pip install --user --break-system-packages -e .
+        }
+    }
     
     Write-ColorText "Inity installed successfully!" $Green
 } catch {
