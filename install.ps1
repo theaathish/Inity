@@ -21,7 +21,7 @@ function Write-ColorText {
     $Host.UI.RawUI.ForegroundColor = $prevColor
 }
 
-# Art banner - Fixed: Split into separate lines
+# Art banner
 Write-ColorText " ___       _ _         " $Blue
 Write-ColorText "|_ _|_ __ (_) |_ _   _ " $Blue
 Write-ColorText " | || '_ \| | __| | | |" $Blue
@@ -36,23 +36,23 @@ Write-Host "=================================================="
 
 Write-ColorText "Detecting system..." $Blue
 Write-Host "OS: Windows"
-Write-Host "PowerShell: $($PSVersionTable.PSVersion)"
+Write-Host ("PowerShell: " + $PSVersionTable.PSVersion)
 
 # Check if Python is available
 try {
-    $pythonVersion = python --version 2>&1
-    Write-ColorText "Python found: $pythonVersion" $Green
+    $pythonVersion = & python --version 2>&1
+    Write-ColorText ("Python found: " + $pythonVersion) $Green
 } catch {
     Write-ColorText "Python is not installed or not in PATH" $Red
     Write-Host "Please install Python 3.8+ from https://python.org"
-    Write-Host "Make sure to check 'Add Python to PATH' during installation"
+    Write-Host "Make sure to check Add Python to PATH during installation"
     exit 1
 }
 
 # Check if pip is available
 try {
-    $pipVersion = pip --version 2>&1
-    Write-ColorText "pip found: $pipVersion" $Green
+    $pipVersion = & pip --version 2>&1
+    Write-ColorText ("pip found: " + $pipVersion) $Green
 } catch {
     Write-ColorText "pip is not installed" $Red
     Write-Host "Please install pip first"
@@ -69,7 +69,7 @@ Write-ColorText "Downloading Inity..." $Blue
 try {
     if (Get-Command git -ErrorAction SilentlyContinue) {
         Write-Host "Using git to clone repository..."
-        git clone https://github.com/theaathish/Inity.git
+        & git clone https://github.com/theaathish/Inity.git
         Set-Location Inity
     } else {
         Write-Host "Downloading as zip archive..."
@@ -79,7 +79,7 @@ try {
         Set-Location "Inity-main"
     }
 } catch {
-    Write-ColorText "Failed to download Inity: $_" $Red
+    Write-ColorText ("Failed to download Inity: " + $_.Exception.Message) $Red
     exit 1
 }
 
@@ -87,20 +87,17 @@ Write-ColorText "Installing Inity..." $Blue
 
 try {
     # Install dependencies and Inity
-    pip install --user -r requirements.txt
-    pip install --user -e .
+    & pip install --user -r requirements.txt
+    & pip install --user -e .
     
     Write-ColorText "Inity installed successfully!" $Green
 } catch {
-    Write-ColorText "Installation failed: $_" $Red
+    Write-ColorText ("Installation failed: " + $_.Exception.Message) $Red
     exit 1
 }
 
-# Create batch file for easier access - Fixed: Use proper here-string
-$batchContent = @'
-@echo off
-python -m smartenv.main %*
-'@
+# Create batch file for easier access
+$batchContent = "@echo off" + [Environment]::NewLine + "python -m smartenv.main %*"
 
 $userPath = [Environment]::GetFolderPath('UserProfile')
 $batchPath = Join-Path $userPath "inity.bat"
@@ -110,11 +107,11 @@ Write-Host ""
 Write-ColorText "Inity installed successfully!" $Green
 Write-Host ""
 
-Write-ColorText "Created batch file: $batchPath" $Blue
-Write-ColorText "To use 'inity' from anywhere, add this to your PATH:" $Yellow
+Write-ColorText ("Created batch file: " + $batchPath) $Blue
+Write-ColorText "To use inity from anywhere add this to your PATH:" $Yellow
 Write-Host "  1. Open Environment Variables settings"
-Write-Host "  2. Add '$userPath' to your PATH"
-Write-Host "  3. Or use full path: $batchPath"
+Write-Host ("  2. Add " + $userPath + " to your PATH")
+Write-Host ("  3. Or use full path: " + $batchPath)
 Write-Host ""
 
 Write-ColorText "Quick Start:" $Cyan
@@ -130,7 +127,7 @@ Write-Host ""
 # Test installation
 Write-ColorText "Testing installation..." $Blue
 try {
-    python -m smartenv.main --version
+    & python -m smartenv.main --version
     Write-ColorText "Inity is ready to use!" $Green
 } catch {
     Write-ColorText "Installation completed but test failed" $Yellow
@@ -143,3 +140,5 @@ Remove-Item $tempDir -Recurse -Force
 
 Write-Host ""
 Write-ColorText "Happy coding with Inity!" $Cyan
+Write-Host "Press any key to continue..."
+$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
