@@ -1,0 +1,175 @@
+Metadata-Version: 2.2
+Name: smartenv
+Version: 0.1.0
+Summary: 🚀 Intelligent Python project environment setup tool
+Home-page: https://github.com/smartenv/smartenv
+Author: SmartEnv Team
+Author-email: team@smartenv.dev
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Topic :: Software Development :: Tools
+Classifier: Topic :: System :: Installation/Setup
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: typer[all]>=0.9.0
+Requires-Dist: rich>=13.0.0
+Requires-Dist: questionary>=1.10.0
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+# 🚀 SmartEnv
+
+**Intelligent Python project environment setup tool**
+
+SmartEnv automates the creation of Python projects with smart defaults, virtual environments, and popular frameworks.
+
+## ✨ Features
+
+- 🎯 **Interactive project creation** with beautiful CLI
+- 🐍 **Automatic virtual environment** setup
+- 📦 **Template-based project generation** (FastAPI, Flask, Django, etc.)
+- 🔐 **Smart .env file generation** with secure defaults
+- 📁 **Organized project structure**
+- 🌟 **Git initialization** with initial commit
+- 🎨 **Rich terminal UI** with progress indicators
+
+## 🚀 Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/smartenv/smartenv.git
+cd smartenv
+
+# Install in development mode
+pip install -e .
+
+# Or install from PyPI (when published)
+pip install smartenv
+```
+
+## 📖 Usage
+
+### Create a new project
+
+```bash
+# Interactive mode (recommended)
+smartenv create
+
+# Quick creation with template
+smartenv create my-api --template fastapi
+
+# Create in specific directory
+smartenv create my-app --dir ~/projects --template flask
+```
+
+### Available templates
+
+```bash
+# List all available templates
+smartenv templates list
+
+# Show template details
+smartenv templates show fastapi
+```
+
+### Initialize existing directory
+
+```bash
+# Initialize current directory
+smartenv init
+
+# Initialize with specific template
+smartenv init --template django
+```
+
+## 🎯 Available Templates
+
+| Template | Description | Key Dependencies |
+|----------|-------------|------------------|
+| `basic` | Minimal Python project | - |
+| `fastapi` | Modern web API | FastAPI, Uvicorn, Pydantic |
+| `flask` | Web application | Flask, SQLAlchemy |
+| `django` | Full-featured web framework | Django |
+| `data-science` | ML/Data analysis | Pandas, NumPy, Jupyter |
+| `cli` | Command-line tool | Typer, Rich |
+
+## 🔧 Example Usage
+
+```bash
+# Create a FastAPI project
+smartenv create my-api --template fastapi
+
+# Navigate and run
+cd my-api
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+python main.py
+
+# API will be available at http://127.0.0.1:8000
+```
+
+## 📁 Generated Project Structure
+
+### FastAPI Project
+```
+my-api/
+├── .env                 # Environment variables
+├── .gitignore          # Git ignore rules
+├── .venv/              # Virtual environment
+├── main.py             # Application entry point
+├── requirements.txt    # Dependencies
+├── README.md          # Project documentation
+└── app/
+    ├── __init__.py
+    ├── routers/        # API routes
+    ├── models/         # Data models
+    └── services/       # Business logic
+```
+
+## 🛠️ Development
+
+```bash
+# Clone and setup development environment
+git clone https://github.com/smartenv/smartenv.git
+cd smartenv
+
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Install in development mode
+pip install -e .
+
+# Run the CLI
+smartenv --help
+```
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Built with [Typer](https://typer.tiangolo.com/) for CLI
+- Styled with [Rich](https://rich.readthedocs.io/) for beautiful terminal output
+- Interactive prompts powered by [Questionary](https://questionary.readthedocs.io/)

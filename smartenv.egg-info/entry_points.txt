@@ -1,0 +1,2 @@
+[console_scripts]
+smartenv = smartenv.main:app
