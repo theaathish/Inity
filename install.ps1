@@ -21,6 +21,116 @@ function Write-ColorText {
     $Host.UI.RawUI.ForegroundColor = $prevColor
 }
 
+function Find-PythonInstallation {
+    Write-ColorText "Searching for Python installations..." $Blue
+    
+    # Common Python installation paths
+    $pythonPaths = @(
+        "$env:LOCALAPPDATA\Programs\Python\Python*\python.exe",
+        "$env:ProgramFiles\Python*\python.exe",
+        "$env:ProgramFiles(x86)\Python*\python.exe",
+        "$env:USERPROFILE\AppData\Local\Programs\Python\Python*\python.exe",
+        "$env:USERPROFILE\anaconda3\python.exe",
+        "$env:USERPROFILE\miniconda3\python.exe",
+        "$env:ProgramData\Anaconda3\python.exe",
+        "$env:ProgramData\Miniconda3\python.exe",
+        "C:\Python*\python.exe"
+    )
+    
+    $foundPythons = @()
+    
+    foreach ($pattern in $pythonPaths) {
+        $matches = Get-ChildItem $pattern -ErrorAction SilentlyContinue | Where-Object { $_.Exists }
+        foreach ($match in $matches) {
+            try {
+                $version = & $match.FullName --version 2>&1
+                if ($version -match "Python (\d+\.\d+)") {
+                    $versionNumber = [Version]$matches[1]
+                    if ($versionNumber -ge [Version]"3.8") {
+                        $foundPythons += @{
+                            Path = $match.FullName
+                            Version = $version.Trim()
+                            VersionNumber = $versionNumber
+                        }
+                    }
+                }
+            } catch {
+                # Skip invalid Python installations
+            }
+        }
+    }
+    
+    # Check Windows Store Python
+    try {
+        $storePython = Get-Command python.exe -ErrorAction SilentlyContinue
+        if ($storePython -and $storePython.Source -like "*WindowsApps*") {
+            $version = & python.exe --version 2>&1
+            if ($version -match "Python (\d+\.\d+)") {
+                $versionNumber = [Version]$matches[1]
+                if ($versionNumber -ge [Version]"3.8") {
+                    $foundPythons += @{
+                        Path = "python.exe"
+                        Version = $version.Trim()
+                        VersionNumber = $versionNumber
+                        IsWindowsStore = $true
+                    }
+                }
+            }
+        }
+    } catch {
+        # Skip Windows Store Python if not accessible
+    }
+    
+    if ($foundPythons.Count -eq 0) {
+        return $null
+    }
+    
+    # Return the newest version
+    $bestPython = $foundPythons | Sort-Object VersionNumber -Descending | Select-Object -First 1
+    return $bestPython
+}
+
+function Add-PythonToPath {
+    param($PythonPath)
+    
+    if ($PythonPath -eq "python.exe") {
+        # Windows Store Python is already in PATH
+        return $true
+    }
+    
+    $pythonDir = Split-Path $PythonPath
+    $scriptsDir = Join-Path $pythonDir "Scripts"
+    
+    try {
+        $currentPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+        $pathsToAdd = @()
+        
+        if (-not $currentPath.Contains($pythonDir)) {
+            $pathsToAdd += $pythonDir
+        }
+        
+        if ((Test-Path $scriptsDir) -and (-not $currentPath.Contains($scriptsDir))) {
+            $pathsToAdd += $scriptsDir
+        }
+        
+        if ($pathsToAdd.Count -gt 0) {
+            $newPath = if ($currentPath) { "$currentPath;" + ($pathsToAdd -join ";") } else { $pathsToAdd -join ";" }
+            [Environment]::SetEnvironmentVariable("PATH", $newPath, "User")
+            
+            # Update current session PATH
+            $env:PATH = "$env:PATH;" + ($pathsToAdd -join ";")
+            
+            Write-ColorText "Added Python to PATH: $($pathsToAdd -join ', ')" $Green
+            return $true
+        }
+        
+        return $true
+    } catch {
+        Write-ColorText "Could not add Python to PATH automatically" $Yellow
+        return $false
+    }
+}
+
 function Remove-ExistingInstallation {
     Write-ColorText "Checking for existing Inity installations..." $Blue
     
@@ -102,27 +212,145 @@ Write-Host ("PowerShell: " + $PSVersionTable.PSVersion)
 # Remove any existing installations first
 Remove-ExistingInstallation
 
-# Check if Python is available
+# Check if Python is available in PATH first
+$pythonFound = $false
+$pythonPath = $null
+
 try {
     $pythonVersion = & python --version 2>&1
-    Write-ColorText ("Python found: " + $pythonVersion) $Green
+    if ($pythonVersion -match "Python (\d+\.\d+)") {
+        $versionNumber = [Version]$matches[1]
+        if ($versionNumber -ge [Version]"3.8") {
+            Write-ColorText ("Python found in PATH: " + $pythonVersion) $Green
+            $pythonFound = $true
+            $pythonPath = "python"
+        } else {
+            Write-ColorText ("Python version too old: " + $pythonVersion) $Yellow
+        }
+    }
 } catch {
-    Write-ColorText "Python is not installed or not in PATH" $Red
-    Write-Host "Please install Python 3.8+ from https://python.org"
-    Write-Host "Make sure to check Add Python to PATH during installation"
-    Read-Host "Press Enter to exit"
-    exit 1
+    # Python not in PATH, continue searching
+}
+
+# If Python not found in PATH, search the system
+if (-not $pythonFound) {
+    Write-ColorText "Python not found in PATH. Searching system..." $Yellow
+    
+    $foundPython = Find-PythonInstallation
+    
+    if ($foundPython) {
+        Write-ColorText ("Found Python installation: " + $foundPython.Version + " at " + $foundPython.Path) $Green
+        
+        # Ask user if they want to add it to PATH
+        Write-Host ""
+        Write-ColorText "Would you like to add Python to your PATH for system-wide access? (y/n): " $Cyan -NoNewline
+        $response = Read-Host
+        
+        if ($response -match "^[Yy]") {
+            if (Add-PythonToPath $foundPython.Path) {
+                $pythonPath = if ($foundPython.Path -eq "python.exe") { "python" } else { $foundPython.Path }
+                $pythonFound = $true
+                Write-ColorText "Python is now available system-wide!" $Green
+            } else {
+                $pythonPath = $foundPython.Path
+                $pythonFound = $true
+                Write-ColorText "Using Python directly from: $($foundPython.Path)" $Green
+            }
+        } else {
+            $pythonPath = $foundPython.Path
+            $pythonFound = $true
+            Write-ColorText "Using Python directly from: $($foundPython.Path)" $Green
+        }
+    }
+}
+
+# If still no Python found, offer to install
+if (-not $pythonFound) {
+    Write-ColorText "Python 3.8+ is required but not found on this system." $Red
+    Write-Host ""
+    Write-ColorText "Would you like to:" $Cyan
+    Write-Host "1. Download and install Python automatically"
+    Write-Host "2. Open Python download page manually"
+    Write-Host "3. Exit and install Python manually"
+    Write-Host ""
+    Write-ColorText "Choose option (1/2/3): " $Cyan -NoNewline
+    $choice = Read-Host
+    
+    switch ($choice) {
+        "1" {
+            Write-ColorText "Downloading Python installer..." $Blue
+            try {
+                $pythonUrl = "https://www.python.org/ftp/python/3.12.0/python-3.12.0-amd64.exe"
+                $installerPath = Join-Path $env:TEMP "python-installer.exe"
+                
+                Invoke-WebRequest -Uri $pythonUrl -OutFile $installerPath
+                
+                Write-ColorText "Running Python installer..." $Blue
+                Write-Host "Please follow the installer and make sure to check 'Add Python to PATH'"
+                
+                Start-Process $installerPath -ArgumentList "/quiet", "InstallAllUsers=1", "PrependPath=1" -Wait
+                
+                # Refresh PATH
+                $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User")
+                
+                # Check if installation was successful
+                try {
+                    $pythonVersion = & python --version 2>&1
+                    Write-ColorText ("Python installed successfully: " + $pythonVersion) $Green
+                    $pythonFound = $true
+                    $pythonPath = "python"
+                } catch {
+                    Write-ColorText "Python installation may not be complete. Please restart your terminal." $Yellow
+                    Read-Host "Press Enter to exit"
+                    exit 1
+                }
+            } catch {
+                Write-ColorText "Failed to download/install Python automatically." $Red
+                Write-ColorText "Please install Python manually from https://python.org" $Yellow
+                Read-Host "Press Enter to exit"
+                exit 1
+            }
+        }
+        "2" {
+            Write-ColorText "Opening Python download page..." $Blue
+            Start-Process "https://python.org/downloads/"
+            Write-Host "Please install Python and run this installer again."
+            Read-Host "Press Enter to exit"
+            exit 1
+        }
+        default {
+            Write-Host "Please install Python 3.8+ from https://python.org"
+            Write-Host "Make sure to check 'Add Python to PATH' during installation"
+            Read-Host "Press Enter to exit"
+            exit 1
+        }
+    }
 }
 
 # Check if pip is available
 try {
-    $pipVersion = & pip --version 2>&1
+    if ($pythonPath -eq "python") {
+        $pipVersion = & pip --version 2>&1
+    } else {
+        $pipPath = Join-Path (Split-Path $pythonPath) "Scripts\pip.exe"
+        if (Test-Path $pipPath) {
+            $pipVersion = & $pipPath --version 2>&1
+        } else {
+            # Try using python -m pip
+            $pipVersion = & $pythonPath -m pip --version 2>&1
+        }
+    }
     Write-ColorText ("pip found: " + $pipVersion) $Green
 } catch {
-    Write-ColorText "pip is not installed" $Red
-    Write-Host "Please install pip first"
-    Read-Host "Press Enter to exit"
-    exit 1
+    Write-ColorText "pip is not available. Installing pip..." $Yellow
+    try {
+        & $pythonPath -m ensurepip --upgrade
+        Write-ColorText "pip installed successfully" $Green
+    } catch {
+        Write-ColorText "Failed to install pip" $Red
+        Read-Host "Press Enter to exit"
+        exit 1
+    }
 }
 
 # Create temporary directory
@@ -162,8 +390,8 @@ try {
         Remove-Item $inityVenv -Recurse -Force
     }
     
-    # Create new virtual environment
-    & python -m venv $inityVenv
+    # Create new virtual environment using the found Python
+    & $pythonPath -m venv $inityVenv
     
     # Get the correct paths for the virtual environment
     $venvPython = Join-Path $inityVenv "Scripts\python.exe"
