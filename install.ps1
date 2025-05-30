@@ -46,6 +46,7 @@ try {
     Write-ColorText "Python is not installed or not in PATH" $Red
     Write-Host "Please install Python 3.8+ from https://python.org"
     Write-Host "Make sure to check Add Python to PATH during installation"
+    Read-Host "Press Enter to exit"
     exit 1
 }
 
@@ -56,6 +57,7 @@ try {
 } catch {
     Write-ColorText "pip is not installed" $Red
     Write-Host "Please install pip first"
+    Read-Host "Press Enter to exit"
     exit 1
 }
 
@@ -80,47 +82,66 @@ try {
     }
 } catch {
     Write-ColorText ("Failed to download Inity: " + $_.Exception.Message) $Red
+    Read-Host "Press Enter to exit"
     exit 1
 }
 
 Write-ColorText "Installing Inity..." $Blue
 
 try {
-    # Try pipx first (recommended for Python applications)
-    if (Get-Command pipx -ErrorAction SilentlyContinue) {
-        Write-Host "Using pipx for installation..."
-        & pipx install -e .
-    } else {
-        # Fall back to pip with --break-system-packages for newer systems
-        Write-Host "Using pip for installation..."
-        try {
-            & pip install --user -r requirements.txt
-            & pip install --user -e .
-        } catch {
-            Write-Host "Trying with break-system-packages flag..."
-            & pip install --user --break-system-packages -r requirements.txt
-            & pip install --user --break-system-packages -e .
-        }
+    # Create isolated virtual environment for Inity on Windows
+    Write-Host "Creating isolated virtual environment for Inity..."
+    $inityVenv = Join-Path $env:LOCALAPPDATA "inity-venv"
+    
+    # Remove existing venv if it exists
+    if (Test-Path $inityVenv) {
+        Remove-Item $inityVenv -Recurse -Force
     }
     
+    # Create new virtual environment
+    & python -m venv $inityVenv
+    
+    # Get the correct paths for the virtual environment
+    $venvPython = Join-Path $inityVenv "Scripts\python.exe"
+    $venvPip = Join-Path $inityVenv "Scripts\pip.exe"
+    
+    # Install in the virtual environment
+    Write-Host "Installing dependencies in virtual environment..."
+    & $venvPip install --upgrade pip
+    & $venvPip install -r requirements.txt
+    & $venvPip install .
+    
+    # Create wrapper batch file in user directory
+    $batchContent = "@echo off" + [Environment]::NewLine + "`"$venvPython`" -m smartenv.main %*"
+    
+    $userPath = [Environment]::GetFolderPath('UserProfile')
+    $batchPath = Join-Path $userPath "inity.bat"
+    $batchContent | Out-File -FilePath $batchPath -Encoding ASCII
+    
     Write-ColorText "Inity installed successfully!" $Green
+    
 } catch {
     Write-ColorText ("Installation failed: " + $_.Exception.Message) $Red
+    Write-Host "Error details: $($_.Exception.Message)"
+    Write-Host ""
+    Write-Host "Manual installation instructions:"
+    Write-Host "1. Install Python from https://python.org"
+    Write-Host "2. Open Command Prompt and run:"
+    Write-Host "   git clone https://github.com/theaathish/Inity.git"
+    Write-Host "   cd Inity"
+    Write-Host "   python -m venv .venv"
+    Write-Host "   .venv\Scripts\activate"
+    Write-Host "   pip install -r requirements.txt"
+    Write-Host "   pip install ."
+    Read-Host "Press Enter to exit"
     exit 1
 }
-
-# Create batch file for easier access
-$batchContent = "@echo off" + [Environment]::NewLine + "python -m smartenv.main %*"
-
-$userPath = [Environment]::GetFolderPath('UserProfile')
-$batchPath = Join-Path $userPath "inity.bat"
-$batchContent | Out-File -FilePath $batchPath -Encoding ASCII
 
 Write-Host ""
 Write-ColorText "Inity installed successfully!" $Green
 Write-Host ""
 
-Write-ColorText ("Created batch file: " + $batchPath) $Blue
+Write-ColorText ("Created launcher: " + $batchPath) $Blue
 Write-ColorText "To use inity from anywhere add this to your PATH:" $Yellow
 Write-Host "  1. Open Environment Variables settings"
 Write-Host ("  2. Add " + $userPath + " to your PATH")
@@ -140,8 +161,8 @@ Write-Host ""
 # Test installation
 Write-ColorText "Testing installation..." $Blue
 try {
-    & python -m smartenv.main --version
-    Write-ColorText "Inity is ready to use!" $Green
+    $testOutput = & $batchPath --version 2>&1
+    Write-ColorText ("Inity is ready to use! " + $testOutput) $Green
 } catch {
     Write-ColorText "Installation completed but test failed" $Yellow
     Write-Host "You may need to restart your command prompt"
@@ -149,9 +170,10 @@ try {
 
 # Cleanup
 Set-Location $env:TEMP
-Remove-Item $tempDir -Recurse -Force
+Remove-Item $tempDir -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Host ""
 Write-ColorText "Happy coding with Inity!" $Cyan
-Write-Host "Press any key to continue..."
-$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+Write-Host ""
+Write-Host "Installation complete. Press Enter to continue..."
+Read-Host

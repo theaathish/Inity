@@ -69,7 +69,8 @@ if ! command -v python3 &> /dev/null && ! command -v python &> /dev/null; then
     if [[ "$OS" == "Darwin" ]]; then
         echo "  brew install python"
     elif [[ "$OS" == "Linux" ]]; then
-        echo "  sudo apt install python3 python3-pip python3-venv  # Ubuntu/Debian"
+        echo "  sudo apt update"
+        echo "  sudo apt install python3 python3-pip python3-venv python3-full  # Ubuntu/Debian"
         echo "  sudo yum install python3 python3-pip  # CentOS/RHEL"
     fi
     exit 1
@@ -83,14 +84,38 @@ fi
 
 echo -e "${GREEN}✅ Python found: $($PYTHON_CMD --version)${NC}"
 
-# Check if we need to handle externally managed environment
-PYTHON_VERSION=$($PYTHON_CMD --version 2>&1 | grep -o '[0-9]\+\.[0-9]\+')
-IS_EXTERNALLY_MANAGED=false
-
-# Check for externally managed environment (common in newer Ubuntu/Debian)
-if [[ "$OS" == "Linux" ]] && $PYTHON_CMD -c "import sysconfig; print(sysconfig.get_path('stdlib'))" 2>/dev/null | grep -q "/usr/lib"; then
-    if [ -f "/usr/share/doc/python${PYTHON_VERSION}/README.venv" ] || [ -f "/usr/lib/python${PYTHON_VERSION}/EXTERNALLY-MANAGED" ]; then
-        IS_EXTERNALLY_MANAGED=true
+# Check for required packages on Linux
+if [[ "$OS" == "Linux" ]]; then
+    echo -e "${BLUE}🔍 Checking for required packages...${NC}"
+    
+    # Check for python3-venv
+    if ! $PYTHON_CMD -c "import venv" 2>/dev/null; then
+        echo -e "${YELLOW}⚠️  python3-venv is not installed${NC}"
+        echo "Installing required packages..."
+        
+        # Detect package manager and install venv
+        if command -v apt &> /dev/null; then
+            echo "Using apt to install python3-venv..."
+            if sudo apt update && sudo apt install -y python3-venv python3-full; then
+                echo -e "${GREEN}✅ python3-venv installed successfully${NC}"
+            else
+                echo -e "${RED}❌ Failed to install python3-venv${NC}"
+                echo "Please run manually: sudo apt install python3-venv python3-full"
+                exit 1
+            fi
+        elif command -v yum &> /dev/null; then
+            echo "Using yum to install python3-venv..."
+            sudo yum install -y python3-venv
+        elif command -v dnf &> /dev/null; then
+            echo "Using dnf to install python3-venv..."
+            sudo dnf install -y python3-venv
+        else
+            echo -e "${RED}❌ Cannot install python3-venv automatically${NC}"
+            echo "Please install it manually:"
+            echo "  Ubuntu/Debian: sudo apt install python3-venv python3-full"
+            echo "  CentOS/RHEL: sudo yum install python3-venv"
+            exit 1
+        fi
     fi
 fi
 
@@ -127,121 +152,99 @@ fi
 
 echo -e "${BLUE}🔧 Installing Inity...${NC}"
 
-# Choose installation method based on system
-if command -v pipx &> /dev/null; then
-    echo "Using pipx for isolated installation..."
-    pipx install .
-    INSTALL_SUCCESS=$?
-elif [[ "$IS_EXTERNALLY_MANAGED" == "true" ]]; then
-    echo "Detected externally managed Python environment..."
-    echo "Creating isolated virtual environment for Inity..."
-    
-    # Create a dedicated venv for Inity
-    INITY_VENV="$HOME/.local/share/inity-venv"
-    mkdir -p "$(dirname "$INITY_VENV")"
-    
-    $PYTHON_CMD -m venv "$INITY_VENV"
-    
-    # Install in the virtual environment
-    "$INITY_VENV/bin/pip" install --upgrade pip
-    "$INITY_VENV/bin/pip" install -r requirements.txt
-    "$INITY_VENV/bin/pip" install .
-    
-    # Create wrapper script
-    cat > "$INSTALL_DIR/inity" << EOL
-#!/bin/bash
-# Inity wrapper script
-# Developed by Aathish at Strucureo
-exec "$INITY_VENV/bin/python" -m smartenv.main "\$@"
-EOL
-    
-    chmod +x "$INSTALL_DIR/inity"
-    INSTALL_SUCCESS=0
-    
-else
-    echo "Using pip with user installation..."
-    # Try different pip installation methods
-    if $PYTHON_CMD -m pip install --user -r requirements.txt && $PYTHON_CMD -m pip install --user .; then
-        INSTALL_SUCCESS=0
-    elif $PYTHON_CMD -m pip install --user --break-system-packages -r requirements.txt && $PYTHON_CMD -m pip install --user --break-system-packages .; then
-        INSTALL_SUCCESS=0
-    else
-        echo -e "${YELLOW}⚠️ Standard pip installation failed. Creating isolated installation...${NC}"
-        
-        # Create a dedicated venv for Inity
-        INITY_VENV="$HOME/.local/share/inity-venv"
-        mkdir -p "$(dirname "$INITY_VENV")"
-        
-        $PYTHON_CMD -m venv "$INITY_VENV"
-        
-        # Install in the virtual environment
-        "$INITY_VENV/bin/pip" install --upgrade pip
-        "$INITY_VENV/bin/pip" install -r requirements.txt
-        "$INITY_VENV/bin/pip" install .
-        
-        # Create wrapper script
-        cat > "$INSTALL_DIR/inity" << EOL
-#!/bin/bash
-# Inity wrapper script
-# Developed by Aathish at Strucureo
-exec "$INITY_VENV/bin/python" -m smartenv.main "\$@"
-EOL
-        
-        chmod +x "$INSTALL_DIR/inity"
-        INSTALL_SUCCESS=0
-    fi
+# Always use isolated virtual environment approach for better compatibility
+echo "Creating isolated virtual environment for Inity..."
+
+# Create a dedicated venv for Inity
+INITY_VENV="$HOME/.local/share/inity-venv"
+mkdir -p "$(dirname "$INITY_VENV")"
+
+# Remove existing venv if it exists
+if [ -d "$INITY_VENV" ]; then
+    echo "Removing existing Inity virtual environment..."
+    rm -rf "$INITY_VENV"
 fi
+
+# Create new virtual environment
+echo "Creating virtual environment at $INITY_VENV..."
+if ! $PYTHON_CMD -m venv "$INITY_VENV"; then
+    echo -e "${RED}❌ Failed to create virtual environment${NC}"
+    echo "This usually means python3-venv is not installed."
+    echo ""
+    echo "Please install it:"
+    if [[ "$OS" == "Linux" ]]; then
+        echo "  Ubuntu/Debian: sudo apt install python3-venv python3-full"
+        echo "  CentOS/RHEL: sudo yum install python3-venv"
+    elif [[ "$OS" == "Darwin" ]]; then
+        echo "  macOS: brew install python"
+    fi
+    exit 1
+fi
+
+# Install in the virtual environment
+echo "Installing dependencies in virtual environment..."
+"$INITY_VENV/bin/pip" install --upgrade pip
+"$INITY_VENV/bin/pip" install -r requirements.txt
+"$INITY_VENV/bin/pip" install .
+
+# Create wrapper script
+echo "Creating wrapper script..."
+cat > "$INSTALL_DIR/inity" << EOL
+#!/bin/bash
+# Inity wrapper script
+# Developed by Aathish at Strucureo
+
+# Check if virtual environment exists
+if [ ! -f "$INITY_VENV/bin/python" ]; then
+    echo "Error: Inity virtual environment not found at $INITY_VENV"
+    echo "Please reinstall Inity"
+    exit 1
+fi
+
+# Execute Inity
+exec "$INITY_VENV/bin/python" -m smartenv.main "\$@"
+EOL
+
+chmod +x "$INSTALL_DIR/inity"
 
 # Cleanup
 cd /
 rm -rf "$TEMP_DIR"
 
-if [ $INSTALL_SUCCESS -eq 0 ]; then
+echo ""
+echo -e "${GREEN}🎉 Inity installed successfully!${NC}"
+echo ""
+
+# Check if installation directory is in PATH
+if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
+    echo -e "${YELLOW}⚠️  Warning: $INSTALL_DIR is not in your PATH${NC}"
+    echo "Add this line to your ~/.bashrc or ~/.zshrc:"
+    echo "export PATH=\"$INSTALL_DIR:\$PATH\""
     echo ""
-    echo -e "${GREEN}🎉 Inity installed successfully!${NC}"
+    echo "Then run: source ~/.bashrc  (or restart your terminal)"
     echo ""
-    
-    # Check if installation directory is in PATH
-    if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
-        echo -e "${YELLOW}⚠️  Warning: $INSTALL_DIR is not in your PATH${NC}"
-        echo "Add this line to your ~/.bashrc or ~/.zshrc:"
-        echo "export PATH=\"$INSTALL_DIR:\$PATH\""
-        echo ""
-        echo "Then run: source ~/.bashrc  (or restart your terminal)"
-        echo ""
-    fi
-    
-    echo -e "${CYAN}🚀 Quick Start:${NC}"
-    echo "  inity --help                    # Show help"
-    echo "  inity create my-awesome-project # Create new project"
-    echo "  inity package search fastapi    # Search packages"
-    echo ""
-    
-    echo -e "${PURPLE}📚 Documentation: https://github.com/theaathish/Inity${NC}"
-    echo -e "${PURPLE}🐛 Issues: https://github.com/theaathish/Inity/issues${NC}"
-    echo ""
-    
-    # Test installation
-    echo -e "${BLUE}🧪 Testing installation...${NC}"
-    if command -v inity &> /dev/null; then
-        echo -e "${GREEN}✅ Inity is ready to use!${NC}"
-        inity --version
-    else
-        echo -e "${YELLOW}⚠️  Inity installed but not in current PATH${NC}"
-        echo "You may need to restart your terminal or update your PATH"
-        echo "Or run: export PATH=\"$INSTALL_DIR:\$PATH\""
-    fi
-    
-    echo ""
-    echo -e "${CYAN}Happy coding with Inity! 🐍✨${NC}"
-else
-    echo -e "${RED}❌ Installation failed${NC}"
-    echo "Please check the error messages above and try manual installation:"
-    echo "  git clone https://github.com/theaathish/Inity.git"
-    echo "  cd Inity"
-    echo "  python3 -m venv .venv"
-    echo "  source .venv/bin/activate"
-    echo "  pip install -r requirements.txt"
-    echo "  pip install ."
-    exit 1
 fi
+
+echo -e "${CYAN}🚀 Quick Start:${NC}"
+echo "  inity --help                    # Show help"
+echo "  inity create my-awesome-project # Create new project"
+echo "  inity package search fastapi    # Search packages"
+echo ""
+
+echo -e "${PURPLE}📚 Documentation: https://github.com/theaathish/Inity${NC}"
+echo -e "${PURPLE}🐛 Issues: https://github.com/theaathish/Inity/issues${NC}"
+echo ""
+
+# Test installation
+echo -e "${BLUE}🧪 Testing installation...${NC}"
+if command -v inity &> /dev/null; then
+    echo -e "${GREEN}✅ Inity is ready to use!${NC}"
+    inity --version
+else
+    echo -e "${YELLOW}⚠️  Inity installed but not in current PATH${NC}"
+    echo "You may need to restart your terminal or update your PATH"
+    echo "Or run: export PATH=\"$INSTALL_DIR:\$PATH\""
+fi
+
+echo ""
+echo -e "${CYAN}Happy coding with Inity! 🐍✨${NC}"
