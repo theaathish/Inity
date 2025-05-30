@@ -15,6 +15,49 @@ PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+install_system_requirements() {
+    echo -e "${BLUE}🔧 Installing system requirements...${NC}"
+    
+    if [[ "$OS" == "Linux" ]]; then
+        if command -v apt &> /dev/null; then
+            echo "Using apt to install requirements..."
+            sudo apt update
+            sudo apt install -y python3 python3-pip python3-venv python3-full git curl unzip
+            return 0
+        elif command -v yum &> /dev/null; then
+            echo "Using yum to install requirements..."
+            sudo yum install -y python3 python3-pip python3-venv git curl unzip
+            return 0
+        elif command -v dnf &> /dev/null; then
+            echo "Using dnf to install requirements..."
+            sudo dnf install -y python3 python3-pip python3-venv git curl unzip
+            return 0
+        elif command -v pacman &> /dev/null; then
+            echo "Using pacman to install requirements..."
+            sudo pacman -S --noconfirm python python-pip git curl unzip
+            return 0
+        elif command -v zypper &> /dev/null; then
+            echo "Using zypper to install requirements..."
+            sudo zypper install -y python3 python3-pip python3-venv git curl unzip
+            return 0
+        fi
+    elif [[ "$OS" == "Darwin" ]]; then
+        if command -v brew &> /dev/null; then
+            echo "Using brew to install requirements..."
+            brew install python git
+            return 0
+        else
+            echo -e "${YELLOW}⚠️ Homebrew not found. Installing Homebrew...${NC}"
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            export PATH="/opt/homebrew/bin:$PATH"
+            brew install python git
+            return 0
+        fi
+    fi
+    
+    return 1
+}
+
 find_python_installation() {
     echo -e "${BLUE}🔍 Searching for Python installations...${NC}"
     
@@ -58,39 +101,6 @@ find_python_installation() {
     # Return the first suitable Python found
     echo "${found_pythons[0]}"
     return 0
-}
-
-install_python_system() {
-    echo -e "${BLUE}🔧 Installing Python...${NC}"
-    
-    if command -v apt &> /dev/null; then
-        echo "Using apt to install Python..."
-        if sudo apt update && sudo apt install -y python3 python3-pip python3-venv python3-full; then
-            return 0
-        fi
-    elif command -v yum &> /dev/null; then
-        echo "Using yum to install Python..."
-        if sudo yum install -y python3 python3-pip python3-venv; then
-            return 0
-        fi
-    elif command -v dnf &> /dev/null; then
-        echo "Using dnf to install Python..."
-        if sudo dnf install -y python3 python3-pip python3-venv; then
-            return 0
-        fi
-    elif command -v pacman &> /dev/null; then
-        echo "Using pacman to install Python..."
-        if sudo pacman -S --noconfirm python python-pip; then
-            return 0
-        fi
-    elif command -v brew &> /dev/null; then
-        echo "Using brew to install Python..."
-        if brew install python; then
-            return 0
-        fi
-    fi
-    
-    return 1
 }
 
 add_python_to_path() {
@@ -246,120 +256,94 @@ elif command -v python &> /dev/null; then
     fi
 fi
 
-# If Python not found in PATH, search the system
+# If Python not found, install system requirements
 if [ "$PYTHON_FOUND" = false ]; then
-    echo -e "${YELLOW}⚠️ Python not found in PATH. Searching system...${NC}"
+    echo -e "${YELLOW}⚠️ Python 3.8+ not found. Installing system requirements...${NC}"
     
-    if python_info=$(find_python_installation); then
-        IFS=':' read -r python_path python_version <<< "$python_info"
-        echo -e "${GREEN}✅ Found Python installation: $python_version at $python_path${NC}"
+    if install_system_requirements; then
+        echo -e "${GREEN}✅ System requirements installed successfully${NC}"
         
-        # Ask user if they want to add it to PATH
-        echo ""
-        echo -e "${CYAN}Would you like to add Python to your PATH for system-wide access? (y/n): ${NC}"
-        read -r response
-        
-        if [[ $response =~ ^[Yy] ]]; then
-            if add_python_to_path "$python_path"; then
-                PYTHON_CMD="python3"
-                PYTHON_FOUND=true
-                echo -e "${GREEN}✅ Python is now available system-wide!${NC}"
-            else
-                PYTHON_CMD="$python_path"
-                PYTHON_FOUND=true
-                echo -e "${GREEN}✅ Using Python directly from: $python_path${NC}"
+        # Recheck for Python after installation
+        if command -v python3 &> /dev/null; then
+            PYTHON_VERSION=$(python3 --version 2>&1)
+            if [[ $PYTHON_VERSION =~ Python\ ([0-9]+)\.([0-9]+) ]]; then
+                MAJOR=${BASH_REMATCH[1]}
+                MINOR=${BASH_REMATCH[2]}
+                if [ "$MAJOR" -gt 3 ] || ([ "$MAJOR" -eq 3 ] && [ "$MINOR" -ge 8 ]); then
+                    echo -e "${GREEN}✅ Python installed: $PYTHON_VERSION${NC}"
+                    PYTHON_CMD="python3"
+                    PYTHON_FOUND=true
+                fi
             fi
-        else
-            PYTHON_CMD="$python_path"
-            PYTHON_FOUND=true
-            echo -e "${GREEN}✅ Using Python directly from: $python_path${NC}"
-        fi
-    fi
-fi
-
-# If still no Python found, offer to install
-if [ "$PYTHON_FOUND" = false ]; then
-    echo -e "${RED}❌ Python 3.8+ is required but not found on this system.${NC}"
-    echo ""
-    echo -e "${CYAN}Would you like to install Python automatically? (y/n): ${NC}"
-    read -r response
-    
-    if [[ $response =~ ^[Yy] ]]; then
-        if install_python_system; then
-            echo -e "${GREEN}✅ Python installed successfully${NC}"
-            # Recheck for Python
-            if command -v python3 &> /dev/null; then
-                PYTHON_CMD="python3"
-                PYTHON_FOUND=true
-            elif command -v python &> /dev/null; then
-                PYTHON_CMD="python"
-                PYTHON_FOUND=true
+        elif command -v python &> /dev/null; then
+            PYTHON_VERSION=$(python --version 2>&1)
+            if [[ $PYTHON_VERSION =~ Python\ ([0-9]+)\.([0-9]+) ]]; then
+                MAJOR=${BASH_REMATCH[1]}
+                MINOR=${BASH_REMATCH[2]}
+                if [ "$MAJOR" -gt 3 ] || ([ "$MAJOR" -eq 3 ] && [ "$MINOR" -ge 8 ]); then
+                    echo -e "${GREEN}✅ Python installed: $PYTHON_VERSION${NC}"
+                    PYTHON_CMD="python"
+                    PYTHON_FOUND=true
+                fi
             fi
-        else
-            echo -e "${RED}❌ Failed to install Python automatically${NC}"
-            echo "Please install Python manually:"
-            if [[ "$OS" == "Darwin" ]]; then
-                echo "  brew install python"
-                echo "  or download from https://python.org"
-            elif [[ "$OS" == "Linux" ]]; then
-                echo "  Ubuntu/Debian: sudo apt install python3 python3-pip python3-venv python3-full"
-                echo "  CentOS/RHEL: sudo yum install python3 python3-pip python3-venv"
-                echo "  or download from https://python.org"
-            fi
-            exit 1
         fi
     else
-        echo "Please install Python 3.8+ and run this installer again"
-        echo "Installation instructions:"
+        echo -e "${RED}❌ Failed to install system requirements${NC}"
+        echo "Please install Python manually:"
         if [[ "$OS" == "Darwin" ]]; then
             echo "  brew install python"
+            echo "  or download from https://python.org"
         elif [[ "$OS" == "Linux" ]]; then
-            echo "  Ubuntu/Debian: sudo apt install python3 python3-pip python3-venv python3-full"
-            echo "  CentOS/RHEL: sudo yum install python3 python3-pip python3-venv"
+            echo "  Ubuntu/Debian: sudo apt install python3 python3-pip python3-venv python3-full git"
+            echo "  CentOS/RHEL: sudo yum install python3 python3-pip python3-venv git"
+            echo "  or download from https://python.org"
         fi
         exit 1
     fi
 fi
 
+# If still no Python found, try manual search
+if [ "$PYTHON_FOUND" = false ]; then
+    echo -e "${YELLOW}⚠️ Python still not found. Searching system...${NC}"
+    
+    if python_info=$(find_python_installation); then
+        IFS=':' read -r python_path python_version <<< "$python_info"
+        echo -e "${GREEN}✅ Found Python installation: $python_version at $python_path${NC}"
+        PYTHON_CMD="$python_path"
+        PYTHON_FOUND=true
+    fi
+fi
+
 if [ "$PYTHON_FOUND" = false ]; then
     echo -e "${RED}❌ Could not find or install Python 3.8+${NC}"
+    echo "Please install Python manually and run this installer again"
     exit 1
 fi
 
-echo -e "${GREEN}✅ Python found: $($PYTHON_CMD --version)${NC}"
+echo -e "${GREEN}✅ Python ready: $($PYTHON_CMD --version)${NC}"
 
-# Check for required packages on Linux
-if [[ "$OS" == "Linux" ]]; then
-    echo -e "${BLUE}🔍 Checking for required packages...${NC}"
+# Ensure git is available
+if ! command -v git &> /dev/null; then
+    echo -e "${RED}❌ Git is required but not found${NC}"
+    echo "Installing git..."
     
-    # Check for python3-venv
-    if ! $PYTHON_CMD -c "import venv" 2>/dev/null; then
-        echo -e "${YELLOW}⚠️ python3-venv is not installed${NC}"
-        echo "Installing required packages..."
-        
-        # Detect package manager and install venv
+    if [[ "$OS" == "Linux" ]]; then
         if command -v apt &> /dev/null; then
-            echo "Using apt to install python3-venv..."
-            if sudo apt update && sudo apt install -y python3-venv python3-full; then
-                echo -e "${GREEN}✅ python3-venv installed successfully${NC}"
-            else
-                echo -e "${RED}❌ Failed to install python3-venv${NC}"
-                echo "Please run manually: sudo apt install python3-venv python3-full"
-                exit 1
-            fi
+            sudo apt install -y git
         elif command -v yum &> /dev/null; then
-            echo "Using yum to install python3-venv..."
-            sudo yum install -y python3-venv
+            sudo yum install -y git
         elif command -v dnf &> /dev/null; then
-            echo "Using dnf to install python3-venv..."
-            sudo dnf install -y python3-venv
-        else
-            echo -e "${RED}❌ Cannot install python3-venv automatically${NC}"
-            echo "Please install it manually:"
-            echo "  Ubuntu/Debian: sudo apt install python3-venv python3-full"
-            echo "  CentOS/RHEL: sudo yum install python3-venv"
-            exit 1
+            sudo dnf install -y git
         fi
+    elif [[ "$OS" == "Darwin" ]]; then
+        if command -v brew &> /dev/null; then
+            brew install git
+        fi
+    fi
+    
+    if ! command -v git &> /dev/null; then
+        echo -e "${RED}❌ Failed to install git${NC}"
+        exit 1
     fi
 fi
 
@@ -369,41 +353,23 @@ cd "$TEMP_DIR"
 
 echo -e "${BLUE}📥 Downloading Inity...${NC}"
 
-# Download and install directly from git
-if command -v git &> /dev/null; then
-    echo "Using git to clone repository..."
-    git clone https://github.com/theaathish/Inity.git
-    cd Inity
-else
-    echo "Downloading as zip archive..."
-    if command -v curl &> /dev/null; then
-        curl -L https://github.com/theaathish/Inity/archive/main.zip -o inity.zip
-    elif command -v wget &> /dev/null; then
-        wget https://github.com/theaathish/Inity/archive/main.zip -O inity.zip
-    else
-        echo -e "${RED}❌ Neither curl nor wget found. Please install one of them.${NC}"
-        exit 1
-    fi
-    
-    if command -v unzip &> /dev/null; then
-        unzip inity.zip
-        cd Inity-main
-    else
-        echo -e "${RED}❌ unzip not found. Please install unzip.${NC}"
-        exit 1
-    fi
+# Always use git for faster download
+echo "Using git to clone repository..."
+if ! git clone https://github.com/theaathish/Inity.git; then
+    echo -e "${RED}❌ Failed to clone repository${NC}"
+    exit 1
 fi
+
+cd Inity
 
 echo -e "${BLUE}🔧 Installing Inity...${NC}"
 
-# Always use isolated virtual environment approach for better compatibility
-echo "Creating fresh isolated virtual environment for Inity..."
-
 # Create a dedicated venv for Inity
+echo "Creating fresh isolated virtual environment for Inity..."
 INITY_VENV="$HOME/.local/share/inity-venv"
 mkdir -p "$(dirname "$INITY_VENV")"
 
-# Remove existing venv if it exists (double-check)
+# Remove existing venv if it exists
 if [ -d "$INITY_VENV" ]; then
     echo "Ensuring clean installation directory..."
     rm -rf "$INITY_VENV"
@@ -413,16 +379,27 @@ fi
 echo "Creating virtual environment at $INITY_VENV..."
 if ! $PYTHON_CMD -m venv "$INITY_VENV"; then
     echo -e "${RED}❌ Failed to create virtual environment${NC}"
-    echo "This usually means python3-venv is not installed."
-    echo ""
-    echo "Please install it:"
+    echo "Attempting to fix venv issues..."
+    
+    # Try to install venv if missing
     if [[ "$OS" == "Linux" ]]; then
-        echo "  Ubuntu/Debian: sudo apt install python3-venv python3-full"
-        echo "  CentOS/RHEL: sudo yum install python3-venv"
-    elif [[ "$OS" == "Darwin" ]]; then
-        echo "  macOS: brew install python"
+        if command -v apt &> /dev/null; then
+            sudo apt install -y python3-venv python3-full
+        elif command -v yum &> /dev/null; then
+            sudo yum install -y python3-venv
+        elif command -v dnf &> /dev/null; then
+            sudo dnf install -y python3-venv
+        fi
+        
+        # Retry virtual environment creation
+        if ! $PYTHON_CMD -m venv "$INITY_VENV"; then
+            echo -e "${RED}❌ Still failed to create virtual environment${NC}"
+            exit 1
+        fi
+    else
+        echo -e "${RED}❌ Virtual environment creation failed${NC}"
+        exit 1
     fi
-    exit 1
 fi
 
 # Install in the virtual environment
@@ -457,7 +434,7 @@ cd /
 rm -rf "$TEMP_DIR"
 
 echo ""
-echo -e "${GREEN}🎉 Fresh Inity installation completed successfully!${NC}"
+echo -e "${GREEN}🎉 Inity installation completed successfully!${NC}"
 echo ""
 
 # Check if installation directory is in PATH
