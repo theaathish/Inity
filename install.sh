@@ -15,6 +15,51 @@ PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+remove_existing_installation() {
+    echo -e "${BLUE}🔍 Checking for existing Inity installations...${NC}"
+    
+    # Remove existing virtual environment
+    INITY_VENV="$HOME/.local/share/inity-venv"
+    if [ -d "$INITY_VENV" ]; then
+        echo -e "${YELLOW}Removing existing virtual environment...${NC}"
+        rm -rf "$INITY_VENV"
+    fi
+    
+    # Remove existing executables from common locations
+    COMMON_PATHS=("/usr/local/bin/inity" "$HOME/.local/bin/inity" "$HOME/bin/inity")
+    for path in "${COMMON_PATHS[@]}"; do
+        if [ -f "$path" ]; then
+            echo -e "${YELLOW}Removing existing executable: $path${NC}"
+            rm -f "$path"
+        fi
+    done
+    
+    # Remove pip-installed inity
+    if command -v pip3 &> /dev/null; then
+        if pip3 list | grep -i inity &> /dev/null; then
+            echo -e "${YELLOW}Removing existing pip installation...${NC}"
+            pip3 uninstall inity -y 2>/dev/null || true
+        fi
+    fi
+    
+    if command -v pip &> /dev/null; then
+        if pip list | grep -i inity &> /dev/null; then
+            echo -e "${YELLOW}Removing existing pip installation...${NC}"
+            pip uninstall inity -y 2>/dev/null || true
+        fi
+    fi
+    
+    # Remove pipx installation
+    if command -v pipx &> /dev/null; then
+        if pipx list | grep -i inity &> /dev/null; then
+            echo -e "${YELLOW}Removing existing pipx installation...${NC}"
+            pipx uninstall inity 2>/dev/null || true
+        fi
+    fi
+    
+    echo -e "${GREEN}✅ Cleanup completed${NC}"
+}
+
 # Art banner
 echo -e "${BLUE}"
 cat << "EOF"
@@ -30,6 +75,9 @@ echo -e "${NC}"
 echo -e "${PURPLE}Inity - Intelligent Python Project Setup Tool${NC}"
 echo -e "${CYAN}Developed by Aathish at Strucureo${NC}"
 echo "=================================================="
+
+# Remove any existing installations first
+remove_existing_installation
 
 # Detect OS
 OS="$(uname -s)"
@@ -153,15 +201,15 @@ fi
 echo -e "${BLUE}🔧 Installing Inity...${NC}"
 
 # Always use isolated virtual environment approach for better compatibility
-echo "Creating isolated virtual environment for Inity..."
+echo "Creating fresh isolated virtual environment for Inity..."
 
 # Create a dedicated venv for Inity
 INITY_VENV="$HOME/.local/share/inity-venv"
 mkdir -p "$(dirname "$INITY_VENV")"
 
-# Remove existing venv if it exists
+# Remove existing venv if it exists (double-check)
 if [ -d "$INITY_VENV" ]; then
-    echo "Removing existing Inity virtual environment..."
+    echo "Ensuring clean installation directory..."
     rm -rf "$INITY_VENV"
 fi
 
@@ -182,13 +230,13 @@ if ! $PYTHON_CMD -m venv "$INITY_VENV"; then
 fi
 
 # Install in the virtual environment
-echo "Installing dependencies in virtual environment..."
+echo "Installing dependencies in fresh virtual environment..."
 "$INITY_VENV/bin/pip" install --upgrade pip
 "$INITY_VENV/bin/pip" install -r requirements.txt
 "$INITY_VENV/bin/pip" install .
 
 # Create wrapper script
-echo "Creating wrapper script..."
+echo "Creating fresh wrapper script..."
 cat > "$INSTALL_DIR/inity" << EOL
 #!/bin/bash
 # Inity wrapper script
@@ -197,7 +245,8 @@ cat > "$INSTALL_DIR/inity" << EOL
 # Check if virtual environment exists
 if [ ! -f "$INITY_VENV/bin/python" ]; then
     echo "Error: Inity virtual environment not found at $INITY_VENV"
-    echo "Please reinstall Inity"
+    echo "Please reinstall Inity using:"
+    echo "curl -sSL https://raw.githubusercontent.com/theaathish/Inity/main/install.sh | bash"
     exit 1
 fi
 
@@ -212,7 +261,7 @@ cd /
 rm -rf "$TEMP_DIR"
 
 echo ""
-echo -e "${GREEN}🎉 Inity installed successfully!${NC}"
+echo -e "${GREEN}🎉 Fresh Inity installation completed successfully!${NC}"
 echo ""
 
 # Check if installation directory is in PATH

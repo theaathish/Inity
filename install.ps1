@@ -21,6 +21,67 @@ function Write-ColorText {
     $Host.UI.RawUI.ForegroundColor = $prevColor
 }
 
+function Remove-ExistingInstallation {
+    Write-ColorText "Checking for existing Inity installations..." $Blue
+    
+    # Check for existing virtual environment
+    $inityVenv = Join-Path $env:LOCALAPPDATA "inity-venv"
+    if (Test-Path $inityVenv) {
+        Write-ColorText "Removing existing virtual environment..." $Yellow
+        Remove-Item $inityVenv -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    
+    # Check for existing batch file
+    $userPath = [Environment]::GetFolderPath('UserProfile')
+    $batchPath = Join-Path $userPath "inity.bat"
+    if (Test-Path $batchPath) {
+        Write-ColorText "Removing existing launcher..." $Yellow
+        Remove-Item $batchPath -Force -ErrorAction SilentlyContinue
+    }
+    
+    # Check for pip-installed inity and remove it
+    try {
+        $pipList = & pip list 2>&1 | Select-String "inity"
+        if ($pipList) {
+            Write-ColorText "Removing existing pip installation..." $Yellow
+            & pip uninstall inity -y 2>&1 | Out-Null
+        }
+    } catch {
+        # Ignore errors if pip list fails
+    }
+    
+    # Check for system-wide installation in Program Files
+    $programFilesPath = "$env:ProgramFiles\Inity"
+    if (Test-Path $programFilesPath) {
+        Write-ColorText "Found system-wide installation. Attempting to remove..." $Yellow
+        try {
+            # Try to run uninstaller if it exists
+            $uninstaller = Join-Path $programFilesPath "uninstall.exe"
+            if (Test-Path $uninstaller) {
+                Start-Process $uninstaller -ArgumentList "/S" -Wait
+            } else {
+                # Manual removal
+                Remove-Item $programFilesPath -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        } catch {
+            Write-ColorText "Could not remove system installation. You may need to uninstall manually." $Yellow
+        }
+    }
+    
+    # Remove from PATH if present
+    try {
+        $currentPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+        if ($currentPath -and $currentPath.Contains($userPath)) {
+            $newPath = $currentPath.Replace(";$userPath", "").Replace("$userPath;", "").Replace($userPath, "")
+            [Environment]::SetEnvironmentVariable("PATH", $newPath, "User")
+        }
+    } catch {
+        # Ignore PATH cleanup errors
+    }
+    
+    Write-ColorText "Cleanup completed." $Green
+}
+
 # Art banner
 Write-ColorText " ___       _ _         " $Blue
 Write-ColorText "|_ _|_ __ (_) |_ _   _ " $Blue
@@ -37,6 +98,9 @@ Write-Host "=================================================="
 Write-ColorText "Detecting system..." $Blue
 Write-Host "OS: Windows"
 Write-Host ("PowerShell: " + $PSVersionTable.PSVersion)
+
+# Remove any existing installations first
+Remove-ExistingInstallation
 
 # Check if Python is available
 try {
@@ -89,11 +153,11 @@ try {
 Write-ColorText "Installing Inity..." $Blue
 
 try {
-    # Create isolated virtual environment for Inity on Windows
-    Write-Host "Creating isolated virtual environment for Inity..."
+    # Create fresh isolated virtual environment for Inity on Windows
+    Write-Host "Creating fresh isolated virtual environment for Inity..."
     $inityVenv = Join-Path $env:LOCALAPPDATA "inity-venv"
     
-    # Remove existing venv if it exists
+    # Ensure clean installation directory
     if (Test-Path $inityVenv) {
         Remove-Item $inityVenv -Recurse -Force
     }
@@ -117,6 +181,18 @@ try {
     $userPath = [Environment]::GetFolderPath('UserProfile')
     $batchPath = Join-Path $userPath "inity.bat"
     $batchContent | Out-File -FilePath $batchPath -Encoding ASCII
+    
+    # Add to user PATH if not already present
+    try {
+        $currentPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+        if (-not $currentPath.Contains($userPath)) {
+            $newPath = if ($currentPath) { "$currentPath;$userPath" } else { $userPath }
+            [Environment]::SetEnvironmentVariable("PATH", $newPath, "User")
+            Write-ColorText "Added to user PATH for easy access" $Green
+        }
+    } catch {
+        Write-ColorText "Could not add to PATH automatically" $Yellow
+    }
     
     Write-ColorText "Inity installed successfully!" $Green
     
@@ -142,10 +218,8 @@ Write-ColorText "Inity installed successfully!" $Green
 Write-Host ""
 
 Write-ColorText ("Created launcher: " + $batchPath) $Blue
-Write-ColorText "To use inity from anywhere add this to your PATH:" $Yellow
-Write-Host "  1. Open Environment Variables settings"
-Write-Host ("  2. Add " + $userPath + " to your PATH")
-Write-Host ("  3. Or use full path: " + $batchPath)
+Write-ColorText "Inity has been added to your PATH" $Green
+Write-Host "You can now use 'inity' from any Command Prompt or PowerShell window"
 Write-Host ""
 
 Write-ColorText "Quick Start:" $Cyan
